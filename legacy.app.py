@@ -1,12 +1,11 @@
 from flask import Flask, request, jsonify
 from transformers import pipeline
 from flask_cors import CORS
-import os
 
 app = Flask(__name__)
 CORS(app)
 
-# Load NER model pipeline
+# Load pipeline
 ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", grouped_entities=True)
 
 @app.route('/analyze', methods=['POST'])
@@ -26,5 +25,4 @@ def home():
     return "Resume NER API is up!", 200
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
