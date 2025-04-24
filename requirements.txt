@@ -3,7 +3,13 @@
 # torch
 # flask-cors
 
-flask==2.3.2
-Flask-Cors==3.0.10
-transformers==4.31.0
-torch==2.1.0
+# flask==2.3.2
+# Flask-Cors==3.0.10
+# transformers==4.31.0
+# torch==2.1.0
+
+numpy<2
+flask
+flask-cors
+transformers
+torch
