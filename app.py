@@ -142,6 +142,9 @@ common_skills = [
     "site reliability engineering", "sre engineer", "sre automation", "sre monitoring",
 ]
 
+# Accessing the Hugging Face token from the environment variable
+hf_token = os.getenv('HF_AUTH_TOKEN')
+
 # Initialize Flask app
 app = Flask(__name__)
 # CORS(app)
@@ -160,9 +163,18 @@ CORS(app, resources={r"/*": {
 # feature_pipeline = pipeline("feature-extraction", model="ml6team/keyphrase-extraction-distilbert-inspec")
 
 # Initialize the resume-ner pipeline (for /deep-structured-analyze)
-resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
+# resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
 # resume_ner_pipeline = pipeline('token-classification', model='Microsoft/MiniLM-L12-H384-uncased', aggregation_strategy='simple')
 # resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
+
+
+# Initialize the pipeline with authentication
+resume_ner_pipeline = pipeline(
+    'token-classification',
+    model='PassbyGrocer/resume-ner',  # or any other model
+    tokenizer='PassbyGrocer/resume-ner',
+    use_auth_token=hf_token  # Using the token securely
+)
 
 # Home route (optional)
 @app.route('/')
