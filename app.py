@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from transformers import pipeline
+
 import re
 # from common_skills import common_skills
 
@@ -143,7 +144,14 @@ common_skills = [
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+# CORS(app)
+CORS(app, resources={r"/*": {
+    "origins": ["http://localhost:3000", "[http://example.com](http://example.com)"],
+    "methods": ["GET", "POST", "PUT", "DELETE"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "expose_headers": ["Content-Type", "Authorization"],
+    "max_age": 3600
+}})
 
 # Load pipelines
 ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", aggregation_strategy="simple")
@@ -198,8 +206,10 @@ def structured_analyze():
     return jsonify(structured)
 
 # --- ROUTE 3: Deep Structured Resume Analysis ---
-@app.route('/deep-structured-analyze', methods=['POST'])
+@app.route('/deep-structured-analyze', methods=['POST', 'OPTIONS'])
 def deep_structured_analyze():
+    if request.method == 'OPTIONS':
+        return '', 200
     data = request.get_json()
     text = data.get('text', '')
     if not text:
