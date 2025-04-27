@@ -160,7 +160,9 @@ ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", agg
 feature_pipeline = pipeline("feature-extraction", model="ml6team/keyphrase-extraction-distilbert-inspec")
 
 # Initialize the resume-ner pipeline (for /deep-structured-analyze)
-resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
+# resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
+# resume_ner_pipeline = pipeline('token-classification', model='Microsoft/MiniLM-L12-H384-uncased', aggregation_strategy='simple')
+resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
 
 # Home route (optional)
 @app.route('/')
@@ -221,6 +223,7 @@ def deep_structured_analyze():
         return jsonify({"error": "No text provided"}), 400
 
     ner_results = resume_ner_pipeline(text)
+    # ner_results = feature_pipeline(text)
 
     structured_resume = {
         "name": None,
