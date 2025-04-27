@@ -155,12 +155,7 @@ CORS(app, resources={r"/*": {
 
 # Load pipelines
 ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", aggregation_strategy="simple")
-
-# Initialize the feature extraction pipeline (for /structured-analyze)
 feature_pipeline = pipeline("feature-extraction", model="ml6team/keyphrase-extraction-distilbert-inspec")
-
-# Initialize the resume-ner pipeline (for /deep-structured-analyze)
-resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
 
 # Home route (optional)
 @app.route('/')
@@ -186,7 +181,7 @@ def structured_analyze():
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    ner_results = feature_pipeline(text)
+    ner_results = ner_pipeline(text)
 
     structured = {
         "names": [],
@@ -220,7 +215,7 @@ def deep_structured_analyze():
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    ner_results = resume_ner_pipeline(text)
+    ner_results = ner_pipeline(text)
 
     structured_resume = {
         "name": None,
