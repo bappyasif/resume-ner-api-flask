@@ -154,15 +154,15 @@ CORS(app, resources={r"/*": {
 }})
 
 # Load pipelines
-# ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", aggregation_strategy="simple")
+ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", aggregation_strategy="simple")
 
 # Initialize the feature extraction pipeline (for /structured-analyze)
-# feature_pipeline = pipeline("feature-extraction", model="ml6team/keyphrase-extraction-distilbert-inspec")
+feature_pipeline = pipeline("feature-extraction", model="ml6team/keyphrase-extraction-distilbert-inspec")
 
 # Initialize the resume-ner pipeline (for /deep-structured-analyze)
-resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
+# resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
 # resume_ner_pipeline = pipeline('token-classification', model='Microsoft/MiniLM-L12-H384-uncased', aggregation_strategy='simple')
-# resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
+resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
 
 # Home route (optional)
 @app.route('/')
@@ -170,47 +170,47 @@ def home():
     return "Resume NER API is running!"
 
 # --- ROUTE 1: Basic NER Analysis ---
-# @app.route('/analyze', methods=['POST'])
-# def analyze():
-#     data = request.get_json()
-#     text = data.get('text', '')
-#     if not text:
-#         return jsonify({"error": "No text provided"}), 400
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    data = request.get_json()
+    text = data.get('text', '')
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
 
-#     ner_results = ner_pipeline(text)
-#     return jsonify(ner_results)
+    ner_results = ner_pipeline(text)
+    return jsonify(ner_results)
 
-# # --- ROUTE 2: Structured Basic Resume Info ---
-# @app.route('/structured-analyze', methods=['POST'])
-# def structured_analyze():
-#     data = request.get_json()
-#     text = data.get('text', '')
-#     if not text:
-#         return jsonify({"error": "No text provided"}), 400
+# --- ROUTE 2: Structured Basic Resume Info ---
+@app.route('/structured-analyze', methods=['POST'])
+def structured_analyze():
+    data = request.get_json()
+    text = data.get('text', '')
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
 
-#     ner_results = feature_pipeline(text)
+    ner_results = feature_pipeline(text)
 
-#     structured = {
-#         "names": [],
-#         "organizations": [],
-#         "locations": [],
-#         "dates": [],
-#     }
+    structured = {
+        "names": [],
+        "organizations": [],
+        "locations": [],
+        "dates": [],
+    }
 
-#     for entity in ner_results:
-#         group = entity.get("entity_group", "")
-#         word = entity.get("word", "")
+    for entity in ner_results:
+        group = entity.get("entity_group", "")
+        word = entity.get("word", "")
         
-#         if group == "PER":
-#             structured["names"].append(word)
-#         elif group == "ORG":
-#             structured["organizations"].append(word)
-#         elif group == "LOC":
-#             structured["locations"].append(word)
-#         elif group == "DATE":
-#             structured["dates"].append(word)
+        if group == "PER":
+            structured["names"].append(word)
+        elif group == "ORG":
+            structured["organizations"].append(word)
+        elif group == "LOC":
+            structured["locations"].append(word)
+        elif group == "DATE":
+            structured["dates"].append(word)
 
-#     return jsonify(structured)
+    return jsonify(structured)
 
 # --- ROUTE 3: Deep Structured Resume Analysis ---
 @app.route('/deep-structured-analyze', methods=['POST', 'OPTIONS'])
