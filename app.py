@@ -169,7 +169,8 @@ CORS(app, resources={r"/*": {
 # resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
 resume_ner_pipeline = pipeline(
     'token-classification',
-    model='mrm8488/bert-mini-finetuned-conll2003-ner',
+    # model='mrm8488/bert-mini-finetuned-conll2003-ner', // private!!
+    model="Davlan/distilbert-base-multilingual-cased-ner-hrl",
     aggregation_strategy='simple'
 )
 
