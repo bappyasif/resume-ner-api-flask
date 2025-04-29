@@ -14,6 +14,40 @@ CORS(app, resources={r"/*": {
     "max_age": 3600
 }})
 
+# ----- Utility: Extract experience section -----
+def extract_experience_sections(text):
+    patterns = [
+        r"(work experience|professional experience|employment history)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
+        r"(experience)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
+    ]
+    matches = []
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            extracted = match.group(2).strip()
+            entries = re.split(r"\n\s*[\-\*\u2022]|\n\d{4}", extracted)
+            matches.extend([entry.strip() for entry in entries if entry.strip()])
+    return matches
+
+def format_resume_summary_input(text):
+    # You can tweak this prompt as needed
+    return f"Summarize this resume: {text.strip()[:2000]}"
+
+def format_resume_text(text):
+    # Normalize whitespace
+    text = re.sub(r'\r\n|\r', '\n', text)  # Normalize line endings
+    text = re.sub(r'\n{2,}', '\n', text)   # Collapse multiple newlines
+    text = re.sub(r'\s{2,}', ' ', text)    # Collapse multiple spaces
+
+    # Remove common bullet characters
+    text = re.sub(r'[•●▪◆▶►]', '-', text)
+
+    # Strip page numbers or headers/footers
+    text = re.sub(r'Page\s*\d+(\sof\s*\d+)?', '', text, flags=re.IGNORECASE)
+
+    return text.strip()
+
+
 # ----- Constants -----
 common_skills = [
     # Programming languages
@@ -155,39 +189,6 @@ common_skills = [
 degree_keywords = [
     "bachelor", "master", "phd", "b.sc", "m.sc", "btech", "mtech", "mba", "msc", "bba", "bs", "ms"
 ]
-
-# ----- Utility: Extract experience section -----
-def extract_experience_sections(text):
-    patterns = [
-        r"(work experience|professional experience|employment history)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
-        r"(experience)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
-    ]
-    matches = []
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            extracted = match.group(2).strip()
-            entries = re.split(r"\n\s*[\-\*\u2022]|\n\d{4}", extracted)
-            matches.extend([entry.strip() for entry in entries if entry.strip()])
-    return matches
-
-def format_resume_summary_input(text):
-    # You can tweak this prompt as needed
-    return f"Summarize this resume: {text.strip()[:2000]}"
-
-def format_resume_text(text):
-    # Normalize whitespace
-    text = re.sub(r'\r\n|\r', '\n', text)  # Normalize line endings
-    text = re.sub(r'\n{2,}', '\n', text)   # Collapse multiple newlines
-    text = re.sub(r'\s{2,}', ' ', text)    # Collapse multiple spaces
-
-    # Remove common bullet characters
-    text = re.sub(r'[•●▪◆▶►]', '-', text)
-
-    # Strip page numbers or headers/footers
-    text = re.sub(r'Page\s*\d+(\sof\s*\d+)?', '', text, flags=re.IGNORECASE)
-
-    return text.strip()
 
 # ----- Pipeline Init -----
 resume_ner_pipeline = pipeline(
