@@ -146,20 +146,6 @@ common_skills = [
 # Accessing the Hugging Face token from the environment variable
 hf_token = os.getenv('HF_AUTH_TOKEN')
 
-def extract_experience_sections(text):
-    patterns = [
-        r"(work experience|professional experience|employment history)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
-        r"(experience)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
-    ]
-    matches = []
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            extracted = match.group(2).strip()
-            entries = re.split(r"\n\s*[\-\*\u2022]|\n\d{4}", extracted)
-            matches.extend([entry.strip() for entry in entries if entry.strip()])
-    return matches
-
 # Initialize Flask app
 app = Flask(__name__)
 # CORS(app)
@@ -171,7 +157,16 @@ CORS(app, resources={r"/*": {
     "max_age": 3600
 }})
 
+# Load pipelines
+# ner_pipeline = pipeline("token-classification", model="dslim/bert-base-NER", aggregation_strategy="simple")
+
+# Initialize the feature extraction pipeline (for /structured-analyze)
+# feature_pipeline = pipeline("feature-extraction", model="ml6team/keyphrase-extraction-distilbert-inspec")
+
 # Initialize the resume-ner pipeline (for /deep-structured-analyze)
+# resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
+# resume_ner_pipeline = pipeline('token-classification', model='Microsoft/MiniLM-L12-H384-uncased', aggregation_strategy='simple')
+# resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
 resume_ner_pipeline = pipeline(
     'token-classification',
     # model='mrm8488/bert-mini-finetuned-conll2003-ner', // private!!
@@ -179,10 +174,62 @@ resume_ner_pipeline = pipeline(
     aggregation_strategy='simple'
 )
 
+
+# Initialize the pipeline with authentication
+# resume_ner_pipeline = pipeline(
+#     'token-classification',
+#     model='PassbyGrocer/resume-ner',  # or any other model
+#     tokenizer='PassbyGrocer/resume-ner',
+#     use_auth_token=hf_token  # Using the token securely
+# )
+
 # Home route (optional)
 @app.route('/')
 def home():
     return "Resume NER API is running!"
+
+# --- ROUTE 1: Basic NER Analysis ---
+# @app.route('/analyze', methods=['POST'])
+# def analyze():
+#     data = request.get_json()
+#     text = data.get('text', '')
+#     if not text:
+#         return jsonify({"error": "No text provided"}), 400
+
+#     ner_results = ner_pipeline(text)
+#     return jsonify(ner_results)
+
+# # --- ROUTE 2: Structured Basic Resume Info ---
+# @app.route('/structured-analyze', methods=['POST'])
+# def structured_analyze():
+#     data = request.get_json()
+#     text = data.get('text', '')
+#     if not text:
+#         return jsonify({"error": "No text provided"}), 400
+
+#     ner_results = feature_pipeline(text)
+
+#     structured = {
+#         "names": [],
+#         "organizations": [],
+#         "locations": [],
+#         "dates": [],
+#     }
+
+#     for entity in ner_results:
+#         group = entity.get("entity_group", "")
+#         word = entity.get("word", "")
+        
+#         if group == "PER":
+#             structured["names"].append(word)
+#         elif group == "ORG":
+#             structured["organizations"].append(word)
+#         elif group == "LOC":
+#             structured["locations"].append(word)
+#         elif group == "DATE":
+#             structured["dates"].append(word)
+
+#     return jsonify(structured)
 
 # --- ROUTE 3: Deep Structured Resume Analysis ---
 @app.route('/deep-structured-analyze', methods=['POST', 'OPTIONS'])
@@ -237,22 +284,24 @@ def deep_structured_analyze():
     for word in text.split():
         if word.isalpha() and len(word) > 3:
             keywords.append(word.lower())
+
+    # Example common skills list
+    # common_skills = [
+    #     "python", "javascript", "react", "nextjs", "nodejs", "aws", "docker",
+    #     "machine learning", "sql", "mongodb", "html", "css", "flask", "django",
+    #     "typescript", "tailwind", "pytorch", "tensorflow", "java", "c++", "c#"
+    # ]
     
 
     structured_resume["skills"] = list(set(keywords).intersection(set(common_skills)))
 
     # 4. Experience (detect sentences mentioning years/months)
     experience_sentences = []
-    # for line in text.split('\n'):
-    #     if re.search(r'\d+\s+(years|months)', line, re.IGNORECASE):
-    #         experience_sentences.append(line.strip())
+    for line in text.split('\n'):
+        if re.search(r'\d+\s+(years|months)', line, re.IGNORECASE):
+            experience_sentences.append(line.strip())
 
-    # structured_resume["experience"] = experience_sentences
-
-     # 4.1 Experience (NER-based + regex section detection)
-    experience_sentences = [line.strip() for line in text.split('\n') if re.search(r'\d+\s+(years|months)', line, re.IGNORECASE)]
-    structured_resume["experience"] = list(set(experience_sentences + extract_experience_sections(text)))
-
+    structured_resume["experience"] = experience_sentences
 
     return jsonify(structured_resume)
 
