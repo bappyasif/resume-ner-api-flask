@@ -3,6 +3,17 @@ from flask_cors import CORS
 from transformers import pipeline
 import re
 
+# Initialize Flask app
+app = Flask(__name__)
+# CORS(app)
+CORS(app, resources={r"/*": {
+    "origins": ["http://localhost:3000", "[http://example.com](http://example.com)"],
+    "methods": ["GET", "POST", "PUT", "DELETE"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "expose_headers": ["Content-Type", "Authorization"],
+    "max_age": 3600
+}})
+
 # ----- Utility: Extract experience section -----
 def extract_experience_sections(text):
     patterns = [
@@ -159,16 +170,6 @@ common_skills = [
 degree_keywords = [
     "bachelor", "master", "phd", "b.sc", "m.sc", "btech", "mtech", "mba", "msc", "bba", "bs", "ms"
 ]
-
-# ----- App Setup -----
-app = Flask(__name__)
-CORS(app, resources={r"/*": {
-    "origins": ["http://localhost:3000", "http://example.com"],
-    "methods": ["GET", "POST", "PUT", "DELETE"],
-    "allow_headers": ["Content-Type", "Authorization"],
-    "expose_headers": ["Content-Type", "Authorization"],
-    "max_age": 3600
-}})
 
 # ----- Pipeline Init -----
 resume_ner_pipeline = pipeline(
