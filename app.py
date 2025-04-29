@@ -167,15 +167,20 @@ CORS(app, resources={r"/*": {
 # resume_ner_pipeline = pipeline('token-classification', model='PassbyGrocer/resume-ner', aggregation_strategy='simple')
 # resume_ner_pipeline = pipeline('token-classification', model='Microsoft/MiniLM-L12-H384-uncased', aggregation_strategy='simple')
 # resume_ner_pipeline = pipeline('token-classification', model='dbmdz/distilbert-base-uncased', aggregation_strategy='simple')
+resume_ner_pipeline = pipeline(
+    'token-classification',
+    model='mrm8488/bert-mini-finetuned-conll2003-ner',
+    aggregation_strategy='simple'
+)
 
 
 # Initialize the pipeline with authentication
-resume_ner_pipeline = pipeline(
-    'token-classification',
-    model='PassbyGrocer/resume-ner',  # or any other model
-    tokenizer='PassbyGrocer/resume-ner',
-    use_auth_token=hf_token  # Using the token securely
-)
+# resume_ner_pipeline = pipeline(
+#     'token-classification',
+#     model='PassbyGrocer/resume-ner',  # or any other model
+#     tokenizer='PassbyGrocer/resume-ner',
+#     use_auth_token=hf_token  # Using the token securely
+# )
 
 # Home route (optional)
 @app.route('/')
