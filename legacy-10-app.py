@@ -1,24 +1,11 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from transformers import pipeline
+
 import re
+# from common_skills import common_skills
 
-# ----- Utility: Extract experience section -----
-def extract_experience_sections(text):
-    patterns = [
-        r"(work experience|professional experience|employment history)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
-        r"(experience)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
-    ]
-    matches = []
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            extracted = match.group(2).strip()
-            entries = re.split(r"\n\s*[\-\*\u2022]|\n\d{4}", extracted)
-            matches.extend([entry.strip() for entry in entries if entry.strip()])
-    return matches
-
-# ----- Constants -----
 common_skills = [
     # Programming languages
     "python", "javascript", "java", "c++", "c#", "swift", "ruby", "php", "go", "rust",
@@ -156,39 +143,59 @@ common_skills = [
     "site reliability engineering", "sre engineer", "sre automation", "sre monitoring",
 ]
 
-degree_keywords = [
-    "bachelor", "master", "phd", "b.sc", "m.sc", "btech", "mtech", "mba", "msc", "bba", "bs", "ms"
-]
+# Accessing the Hugging Face token from the environment variable
+hf_token = os.getenv('HF_AUTH_TOKEN')
 
-# ----- App Setup -----
+def extract_experience_sections(text):
+    patterns = [
+        r"(work experience|professional experience|employment history)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
+        r"(experience)\s*[:\-]?\s*((.|\n)+?)(?=(skills|education|certifications|projects|$))",
+    ]
+    matches = []
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            extracted = match.group(2).strip()
+            entries = re.split(r"\n\s*[\-\*\u2022]|\n\d{4}", extracted)
+            matches.extend([entry.strip() for entry in entries if entry.strip()])
+    return matches
+
+# Initialize Flask app
 app = Flask(__name__)
+# CORS(app)
 CORS(app, resources={r"/*": {
-    "origins": ["http://localhost:3000", "http://example.com"],
+    "origins": ["http://localhost:3000", "[http://example.com](http://example.com)"],
     "methods": ["GET", "POST", "PUT", "DELETE"],
     "allow_headers": ["Content-Type", "Authorization"],
     "expose_headers": ["Content-Type", "Authorization"],
     "max_age": 3600
 }})
 
-# ----- Pipeline Init -----
+# Initialize the resume-ner pipeline (for /deep-structured-analyze)
 resume_ner_pipeline = pipeline(
     'token-classification',
+    # model='mrm8488/bert-mini-finetuned-conll2003-ner', // private!!
     model="Davlan/distilbert-base-multilingual-cased-ner-hrl",
     aggregation_strategy='simple'
 )
 
-# ----- Route -----
+# Home route (optional)
+@app.route('/')
+def home():
+    return "Resume NER API is running!"
+
+# --- ROUTE 3: Deep Structured Resume Analysis ---
 @app.route('/deep-structured-analyze', methods=['POST', 'OPTIONS'])
 def deep_structured_analyze():
     if request.method == 'OPTIONS':
         return '', 200
-
     data = request.get_json()
     text = data.get('text', '')
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
     ner_results = resume_ner_pipeline(text)
+    # ner_results = feature_pipeline(text)
 
     structured_resume = {
         "name": None,
@@ -198,15 +205,15 @@ def deep_structured_analyze():
         "experience": [],
         "education": [],
         "organizations": [],
-        "certifications": [],
         "dates": [],
         "locations": [],
     }
 
-    # 1. NER entity extraction
+    # 1. Extract using NER
     for entity in ner_results:
         group = entity.get("entity_group", "")
         word = entity.get("word", "")
+        
         if group == "PER" and not structured_resume["name"]:
             structured_resume["name"] = word
         elif group == "ORG":
@@ -218,46 +225,37 @@ def deep_structured_analyze():
         elif group == "DATE":
             structured_resume["dates"].append(word)
 
-    # 2. Email and Phone
+    # 2. Extract Email and Phone using regex
     email_regex = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
     phone_regex = re.compile(r"(\+?\d{1,3})?[-.\s]?(\(?\d{3}\)?)[-.\s]?\d{3}[-.\s]?\d{4}")
 
     structured_resume["emails"] = email_regex.findall(text)
     structured_resume["phones"] = ["".join(phone) for phone in phone_regex.findall(text)]
 
-    # 3. Skills (keyword match)
-    found_skills = []
-    for skill in common_skills:
-        if re.search(rf"\b{re.escape(skill)}\b", text, re.IGNORECASE):
-            found_skills.append(skill)
-    structured_resume["skills"] = list(set(found_skills))
+    # 3. Extract Skills (basic filtering)
+    keywords = []
+    for word in text.split():
+        if word.isalpha() and len(word) > 3:
+            keywords.append(word.lower())
+    
 
-    # 4. Education (manual degree keyword scan)
-    education_matches = []
-    for line in text.split('\n'):
-        if any(degree in line.lower() for degree in degree_keywords):
-            education_matches.append(line.strip())
-    structured_resume["education"].extend(list(set(education_matches)))
+    structured_resume["skills"] = list(set(keywords).intersection(set(common_skills)))
 
-    # 5. Certifications
-    cert_lines = []
-    for line in text.split('\n'):
-        if "certified" in line.lower() or "certificate" in line.lower() or "certification" in line.lower():
-            cert_lines.append(line.strip())
-    structured_resume["certifications"] = list(set(cert_lines))
+    # 4. Experience (detect sentences mentioning years/months)
+    experience_sentences = []
+    # for line in text.split('\n'):
+    #     if re.search(r'\d+\s+(years|months)', line, re.IGNORECASE):
+    #         experience_sentences.append(line.strip())
 
-    # 6. Experience: years/months line + section match
-    exp_lines = [line.strip() for line in text.split('\n') if re.search(r'\d+\s+(years|months)', line, re.IGNORECASE)]
-    exp_section = extract_experience_sections(text)
-    structured_resume["experience"] = list(set(exp_lines + exp_section))
+    # structured_resume["experience"] = experience_sentences
+
+     # 4.1 Experience (NER-based + regex section detection)
+    experience_sentences = [line.strip() for line in text.split('\n') if re.search(r'\d+\s+(years|months)', line, re.IGNORECASE)]
+    structured_resume["experience"] = list(set(experience_sentences + extract_experience_sections(text)))
+
 
     return jsonify(structured_resume)
 
-# ----- Optional Home Route -----
-@app.route('/')
-def home():
-    return "Resume NER API is running!"
-
-# ----- Run Server -----
+# Main
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=10000)
