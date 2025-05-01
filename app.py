@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from transformers import pipeline, AutoTokenizer
+from transformers import pipeline
 import re
 
 # Initialize Flask app
@@ -179,15 +179,42 @@ resume_ner_pipeline = pipeline(
 )
 
 # Load model & tokenizer once
-summary_pipeline = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
-summary_tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+# summary_pipeline = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
+# summary_tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
 
 # Helper function to truncate based on tokenizer
-def safe_truncate_text(text, max_tokens=1024):
-    tokens = summary_tokenizer.encode(text, truncation=True, max_length=max_tokens, return_tensors="pt")
-    return summary_tokenizer.decode(tokens[0], skip_special_tokens=True)
+# def safe_truncate_text(text, max_tokens=1024):
+#     tokens = summary_tokenizer.encode(text, truncation=True, max_length=max_tokens, return_tensors="pt")
+#     return summary_tokenizer.decode(tokens[0], skip_special_tokens=True)
 
 # ----- Route -----
+# @app.route('/resume-summary', methods=['POST', 'OPTIONS'])
+# def resume_summary():
+#     if request.method == 'OPTIONS':
+#         return '', 200
+
+#     data = request.get_json()
+#     text = data.get('text', '')
+#     if not text:
+#         return jsonify({"error": "No text provided"}), 400
+
+#     try:
+#         # Optional: clean or format resume text
+#         formatted_text = text.replace('\n', ' ').strip()
+        
+#         # Truncate properly to avoid token length errors
+#         truncated_text = safe_truncate_text(formatted_text)
+
+#         # Generate summary
+#         summary = summary_pipeline(truncated_text)[0]["summary_text"]
+
+#         return jsonify({"summary": summary})
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
+
+# Lightweight summarization pipeline
+summary_pipeline = pipeline("summarization", model="Falconsai/text_summarization")
+
 @app.route('/resume-summary', methods=['POST', 'OPTIONS'])
 def resume_summary():
     if request.method == 'OPTIONS':
@@ -199,16 +226,13 @@ def resume_summary():
         return jsonify({"error": "No text provided"}), 400
 
     try:
-        # Optional: clean or format resume text
-        formatted_text = text.replace('\n', ' ').strip()
-        
-        # Truncate properly to avoid token length errors
-        truncated_text = safe_truncate_text(formatted_text)
+        # Truncate text to avoid overflow (Falconsai handles longer than BART, but be cautious)
+        max_input_length = 1024  # empirical limit for this model
+        text = text[:max_input_length]
 
-        # Generate summary
-        summary = summary_pipeline(truncated_text)[0]["summary_text"]
-
+        summary = summary_pipeline(text, max_length=150, min_length=40, do_sample=False)[0]['summary_text']
         return jsonify({"summary": summary})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
