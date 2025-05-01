@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from transformers import pipeline, AutoTokenizer
+from transformers import pipeline
 import re
 
 # Initialize Flask app
@@ -28,6 +28,25 @@ def extract_experience_sections(text):
             entries = re.split(r"\n\s*[\-\*\u2022]|\n\d{4}", extracted)
             matches.extend([entry.strip() for entry in entries if entry.strip()])
     return matches
+
+def format_resume_summary_input(text):
+    # You can tweak this prompt as needed
+    return f"Summarize this resume: {text.strip()[:2000]}"
+
+def format_resume_text(text):
+    # Normalize whitespace
+    text = re.sub(r'\r\n|\r', '\n', text)  # Normalize line endings
+    text = re.sub(r'\n{2,}', '\n', text)   # Collapse multiple newlines
+    text = re.sub(r'\s{2,}', ' ', text)    # Collapse multiple spaces
+
+    # Remove common bullet characters
+    text = re.sub(r'[•●▪◆▶►]', '-', text)
+
+    # Strip page numbers or headers/footers
+    text = re.sub(r'Page\s*\d+(\sof\s*\d+)?', '', text, flags=re.IGNORECASE)
+
+    return text.strip()
+
 
 # ----- Constants -----
 common_skills = [
@@ -178,14 +197,8 @@ resume_ner_pipeline = pipeline(
     aggregation_strategy='simple'
 )
 
-# Load model & tokenizer once
-summary_pipeline = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
-summary_tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-
-# Helper function to truncate based on tokenizer
-def safe_truncate_text(text, max_tokens=1024):
-    tokens = summary_tokenizer.encode(text, truncation=True, max_length=max_tokens, return_tensors="pt")
-    return summary_tokenizer.decode(tokens[0], skip_special_tokens=True)
+# Initialize summarization pipeline (keep it lightweight)
+summary_pipeline = pipeline("text2text-generation", model="google/flan-t5-small")
 
 # ----- Route -----
 @app.route('/resume-summary', methods=['POST', 'OPTIONS'])
@@ -194,21 +207,16 @@ def resume_summary():
         return '', 200
 
     data = request.get_json()
-    text = data.get('text', '')
+    text = data.get("text", "")
     if not text:
-        return jsonify({"error": "No text provided"}), 400
+        return jsonify({"error": "No resume text provided"}), 400
+    
+    text = format_resume_text(text)
 
     try:
-        # Optional: clean or format resume text
-        formatted_text = text.replace('\n', ' ').strip()
-        
-        # Truncate properly to avoid token length errors
-        truncated_text = safe_truncate_text(formatted_text)
-
-        # Generate summary
-        summary = summary_pipeline(truncated_text)[0]["summary_text"]
-
-        return jsonify({"summary": summary})
+        formatted_input = format_resume_summary_input(text)
+        summary_output = summary_pipeline(formatted_input, max_new_tokens=150)[0]["generated_text"]
+        return jsonify({"summary": summary_output})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -221,6 +229,8 @@ def deep_structured_analyze():
     text = data.get('text', '')
     if not text:
         return jsonify({"error": "No text provided"}), 400
+    
+    text = format_resume_text(text)
 
     ner_results = resume_ner_pipeline(text)
 
