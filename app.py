@@ -178,7 +178,32 @@ resume_ner_pipeline = pipeline(
     aggregation_strategy='simple'
 )
 
+# Lightweight summarization pipeline
+summary_pipeline = pipeline("summarization", model="Falconsai/text_summarization")
+
 # ----- Route -----
+@app.route('/resume-summary', methods=['POST', 'OPTIONS'])
+def resume_summary():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    data = request.get_json()
+    text = data.get('text', '')
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+
+    try:
+        # Truncate text to avoid overflow (Falconsai handles longer than BART, but be cautious)
+        max_input_length = 1024  # empirical limit for this model
+        text = text[:max_input_length]
+
+        summary = summary_pipeline(text, max_length=150, min_length=40, do_sample=False)[0]['summary_text']
+        return jsonify({"summary": summary})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    
 @app.route('/deep-structured-analyze', methods=['POST', 'OPTIONS'])
 def deep_structured_analyze():
     if request.method == 'OPTIONS':
